@@ -16,7 +16,7 @@ st.set_page_config(
 st.title("🚨 Sistema Integrado de Alertas, Mitigación y Planes de Evacuación")
 st.markdown("### Centro de Operaciones de Emergencia (COE) | SIC 2026 - Grupo 5")
 
-# Diccionario estratégico de albergues por comuna para la sección de logística operativa
+# Diccionario operativo de albergues habilitados por comuna para la sección logística
 albergues_biobio = {
     "Concepción": "Gimnasio Municipal (Av. Collao 525) - Abierto 24/7",
     "Los Ángeles": "Liceo Comercial (Ricardo Vicuña 310) - Zona de Resguardo",
@@ -31,32 +31,34 @@ albergues_biobio = {
 }
 
 # ==============================================================================
-# 2. CARGA Y LIMPIEZA DE DATOS AUTOMATIZADA (CON RUTAS OFICIALES REVISADAS)
+# 2. CARGA Y LIMPIEZA DE DATOS AUTOMATIZADA (ENRUTAMIENTO ABSOLUTO)
 # ==============================================================================
 @st.cache_data
 def inicializar_sistema():
-    # DECISIÓN NO OBVIA: Usamos os.path para construir rutas absolutas dinámicas. 
-    # Esto evita que Streamlit Cloud falle por problemas de contexto del directorio de trabajo actual (CWD).
+    # DECISIÓN NO OBVIA DE ENRUTAMIENTO: Usamos os.path dinámico basado en __file__.
+    # Esto asegura que sin importar si la app corre localmente o en los servidores
+    # de Streamlit Cloud, el sistema siempre encuentre la subcarpeta 'data/' relativa al script.
     base_path = os.path.dirname(__file__)
     
     ruta_comunas = os.path.join(base_path, "data", "Latitud - Longitud Chile.csv")
     ruta_bosques = os.path.join(base_path, "data", "bosques_chile_excel.csv")
     
-    # Lectura del dataset demográfico estructurado regional
     df_c = pd.read_csv(ruta_comunas)
     
-    # Filtrado estricto por codificación invisible en strings de la base de datos original (\xa0Biobío)
+    # DECISIÓN NO OBVIA DE FILTRADO: El string 'Biobío' en el dataset original posee un carácter
+    # invisible de espacio de no separación (\xa0). El uso de .str.contains() previene que el filtrado 
+    # devuelva un dataframe vacío por discordancia de codificación UTF-8.
     df_c = df_c[df_c['Región'].astype(str).str.contains('Biobío')]
     
     df_c['comuna'] = df_c['Comuna'].str.strip()
     df_c['latitud_decimal'] = df_c['Latitud (Decimal)']
     df_c['longitud_decimal'] = df_c['Longitud (decimal)']
     
-    # DECISIÓN NO OBVIA: Formateo de tipos en población. Reemplazamos tanto comas como puntos
-    # para prevenir colapsos de casting numérico debido a formatos regionales heterogéneos de Excel.
+    # DECISIÓN NO OBVIA DE LIMPIEZA NUMÉRICA: Reemplazamos tanto comas como puntos en un string
+    # antes de transformar a entero. Esto evita caídas del backend debidas a formatos inconsistentes 
+    # de separadores de miles en el volcado original de Excel.
     df_c['poblacion_2017'] = df_c['Población Año 2017'].astype(str).str.replace(',', '').str.replace('.', '').astype(float).astype(int)
     
-    # Lectura del inventario forestal oficial de CONAF
     df_b = pd.read_csv(ruta_bosques, sep=';')
     df_b['Región'] = df_b['Región'].str.strip()
     
@@ -70,7 +72,7 @@ def inicializar_sistema():
         "plantacion_forestal_ha": limpiar_numero_chileno(row_biobio['Plantación Forestal']),
         "bosque_nativo_ha": limpiar_numero_chileno(row_biobio['Bosque Nativo']),
         "bosque_mixto_ha": limpiar_numero_chileno(row_biobio['Bosque Mixto']),
-        "humedales_ha": 10172.8,  # Constante ecológica regional validada en el informe base
+        "humedales_ha": 10172.8, # Constante ecológica regional validada según informe de humedales
         "bosques_total_ha": limpiar_numero_chileno(row_biobio['Total'])
     }
     
@@ -80,7 +82,7 @@ try:
     df_comunas, datos_biobio = inicializar_sistema()
 except Exception as e:
     st.error(f"❌ Error crítico en el enrutamiento de archivos locales: {e}")
-    st.info("Asegúrate de que tus archivos estén en la ruta: proyectos/grupo-5/data/")
+    st.info("Asegúrese de que el dataset se ubique exactamente en: proyectos/grupo-5/data/")
     st.stop()
 
 # ==============================================================================
@@ -100,10 +102,11 @@ pendiente = st.sidebar.slider("⛰️ Pendiente media del Terreno (%)", 0, 50, 1
 horas_ev = st.sidebar.slider("⏳ Ventana de Simulación (Horas)", 1, 12, 4)
 
 # ==============================================================================
-# 4. ALGORITMO MATEMÁTICO DE PROPAGACIÓN (PROS/CONTRAS ROTHERMEL SIMPLIFICADO)
+# 4. ALGORITMO MATEMÁTICO DE PROPAGACIÓN
 # ==============================================================================
-# DECISIÓN NO OBVIA: Ponderación de inflamabilidad del material forestal fino muerto.
-# El pino y eucalipto (plantaciones) reciben peso 1.0 por la alta continuidad vertical del dosel.
+# DECISIÓN NO OBVIA: Ponderación de inflamabilidad basada en el Modelo de Rothermel (1972).
+# Se asigna peso máximo (1.0) a plantaciones artificiales por su alta continuidad de canopia,
+# reduciendo gradualmente en bosque mixto (0.8) y nativo (0.6) por mayor retención foliar de humedad.
 combustible = (
     (datos_biobio["plantacion_forestal_ha"] * 1.0) +
     (datos_biobio["bosque_mixto_ha"] * 0.8) +
@@ -112,26 +115,27 @@ combustible = (
 
 sequedad = 100 - humedad
 
-# Matriz lineal ponderada sustituta del modelo físico-químico complejo de fluidos
+# Matriz predictiva sustituta lineal para el Índice de Propagación (IP)
 ip = (0.30 * viento) + (0.30 * combustible) + (0.20 * temperatura) + (0.10 * sequedad) + (0.10 * pendiente)
 ip = min(max(ip, 0), 100)
 
-# Ecuaciones operativas educativas de velocidad cinética y radio geodésico resultante
+# Ecuaciones educativas de velocidad y rango geodésico
 velocidad_fuego = 0.5 + ((ip / 100) * 4.0) + ((viento / 100) * 3.0)
-alcance_km = velocidad_fuego * hours_ev
+alcance_km = velocidad_fuego * horas_ev
 
-# Extraer coordenadas del foco emisor seleccionado
 origen_fila = df_comunas[df_comunas['comuna'] == comuna_origen].iloc[0]
 lat_o, lon_o = origen_fila['latitud_decimal'], origen_fila['longitud_decimal']
 
-# DECISIÓN NO OBVIA: Conversión de distancia mediante aproximación esférica simplificada.
-# Multiplicar por 111.12 km aproxima de forma óptima las distancias euclidianas a kilómetros reales en Chile.
+# DECISIÓN NO OBVIA DE GEOMETRÍA: Uso de aproximación esférica euclidiana multiplicada por 111.12.
+# Este factor transforma directamente la diferencia de grados sexagesimales de latitud/longitud
+# a kilómetros lineales terrestres, optimizando drásticamente el coste de procesamiento en bucles de pandas.
 df_comunas['distancia_foco_km'] = np.sqrt((df_comunas['latitud_decimal'] - lat_o)**2 + (df_comunas['longitud_decimal'] - lon_o)**2) * 111.12
 df_comunas['dif_lat'] = df_comunas['latitud_decimal'] - lat_o
 df_comunas['dif_lon'] = df_comunas['longitud_decimal'] - lon_o
 
-# DECISIÓN NO OBVIA: El filtro de trayectoria asume coordenadas cartesianas planas.
-# Si el viento va al Norte, el fuego viaja al hemisferio norte (dif_lat > 0). Simplificación geométrica para UX.
+# DECISIÓN NO OBVIA DE TRAYECTORIA: El viento se modela vectorialmente en un plano cartesiano simple.
+# Si el viento sopla hacia el 'Norte', significa que empuja las llamas hacia arriba en el mapa, 
+# por ende, solo se verán afectadas las comunas cuya diferencia de latitud relativa sea positiva (dif_lat > 0).
 def evaluar_trayectoria(row):
     if row['comuna'] == comuna_origen: return True
     if dir_viento == "Norte" and row['dif_lat'] > 0: return True
@@ -143,7 +147,6 @@ def evaluar_trayectoria(row):
 
 df_comunas['En_Trayectoria'] = df_comunas.apply(evaluar_trayectoria, axis=1)
 
-# Cálculo probabilístico inverso indexado a los rangos requeridos por la pauta
 def calcular_probabilidad_y_rango(row):
     if row['comuna'] == comuna_origen:
         return 100.0, "🔴 Extremo (Foco)"
@@ -164,7 +167,7 @@ df_comunas['Probabilidad (%)'] = [round(r[0], 1) for r in resultados]
 df_comunas['Clasificacion_Riesgo'] = [r[1] for r in resultados]
 
 # ==============================================================================
-# 5. DISEÑO DE PESTAÑAS (MÓDULOS DE INTERFAZ UX INTERACTIVOS)
+# 5. DISEÑO DE PESTAÑAS INTERACTIVAS (MÓDULOS UX)
 # ==============================================================================
 tab_mapa, tab_tabla, tab_datos, tab_contexto, tab_prevencion = st.tabs([
     "🖥️ Simulador y Mapa de Crisis", 
@@ -181,11 +184,10 @@ with tab_mapa:
     comunas_afectadas = df_comunas[df_comunas['Probabilidad (%)'] >= 25]
     poblacion_afectada = comunas_afectadas['poblacion_2017'].sum()
     
-    # DECISIÓN NO OBVIA: Constante habitacional demográfica de Chile.
-    # El factor 3.2 representa la densidad habitacional urbana/rural promedio según los últimos censos del INE.
+    # DECISIÓN NO OBVIA: Constante demográfica habitacional. Se divide por 3.2 basándose
+    # en la densidad habitacional promedio nacional por hogar registrada por el INE (Chile).
     viviendas_afectadas = poblacion_afectada / 3.2
 
-    # Despliegue de KPIs analíticos reactivos
     m1, m2, m3, m4 = st.columns(4)
     with m1: st.metric("Índice de Gravedad (IP)", f"{ip:.1f} %")
     with m2: st.metric("Velocidad de Avance Frontal", f"{velocidad_fuego:.2f} km/h")
@@ -212,8 +214,6 @@ with tab_mapa:
         )
         fig_mapa.update_traces(hovertemplate="<b>%{hovertext}</b><br><br>Riesgo: %{customdata[0]}<br>Distancia: %{customdata[1]}<br>Probabilidad: %{customdata[2]}<br><b>Viento:</b> " + f"{viento} km/h hacia el {dir_viento}<br>")
         fig_mapa.update_layout(margin={"r":0,"t":0,"l":0,"b":0}, legend=dict(title_text="Riesgo SENAPRED", y=0.99, x=0.01, bgcolor="rgba(255, 255, 255, 0.8)"))
-        
-        # 'scrollZoom': True inyecta la capacidad de interactuar con la rueda del ratón de forma directa sin usar botones estáticos
         st.plotly_chart(fig_mapa, use_container_width=True, config={'displayModeBar': True, 'scrollZoom': True})
 
     with col_graficos:
@@ -265,8 +265,8 @@ with tab_datos:
     st.subheader("💾 Exportación de Reportes Técnicos para Autoridades")
     st.write("Puedes descargar el estado actual de la simulación en un archivo perfectamente compatible con Excel:")
     
-    # DECISIÓN NO OBVIA: El parámetro sep=';' combinado con encoding='utf-8-sig' fuerza a Excel
-    # a procesar la delimitación estructural de celdas y acentos latinos correctamente sin requerir el asistente manual de importación.
+    # DECISIÓN NO OBVIA DE EXPORTACIÓN: El parámetro sep=';' combinado con encoding='utf-8-sig' fuerza a Excel
+    # a mapear de manera automática la delimitación estructural de celdas en sistemas locales sin requerir parseos manuales.
     csv_data = df_tabla_limpia.to_csv(index=False, sep=';').encode('utf-8-sig')
     st.download_button(
         label="📥 Descargar resultado en formato CSV para Excel",
