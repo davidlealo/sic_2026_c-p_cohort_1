@@ -50,11 +50,11 @@ Crea una carpeta llamada .streamlit en la raíz del proyecto y dentro un archivo
 Ini, TOML
 CNE_EMAIL = "tu_correo@ejemplo.com"
 CNE_PASSWORD = "tu_clave"
-GOOGLE_API_KEY = "tu_api_key_de_gemini"```
+GOOGLE_API_KEY = "tu_api_key_de_gemini"
 
 Ejecuta la aplicación:
 
-```bash
+
 streamlit run app.py```
 
 ## 👥Integrantes del Equipo
