@@ -188,7 +188,9 @@ tab_mapa, tab_tabla, tab_datos, tab_contexto, tab_prevencion = st.tabs([
     "🌲 Plan Maestro Comunitario y Prevención"
 ])
 
+# ------------------------------------------------------------------------------
 # PESTAÑA 1: MAPA Y CONTROLES OPERATIVOS
+# ------------------------------------------------------------------------------
 with tab_mapa:
     comunas_afectadas = df_comunas[df_comunas['Probabilidad (%)'] >= 25]
     poblacion_afectada = comunas_afectadas['poblacion_2017'].sum()
@@ -209,9 +211,10 @@ with tab_mapa:
             df_comunas, lat="latitud_decimal", lon="longitud_decimal",
             color="Clasificacion_Riesgo", size="poblacion_2017",
             color_discrete_map={
-                "🔴 Alerta Roja (Extremo)": "#FF0000", "🔴 Alerta Roja (Extremo)": "#D32F2F",
+                "🔴 Alerta Roja (Extremo)": "#FF0000",
                 "🟠 Alerta Amarilla (Alto)": "#F57C00", "🟡 Alerta Temprana Preventiva (Medio)": "#FBC02D", "🟢 Alerta Verde (Bajo)": "#388E3C"
             },
+            category_orders={"Clasificacion_Riesgo": ["🔴 Alerta Roja (Extremo)", "🟠 Alerta Amarilla (Alto)", "🟡 Alerta Temprana Preventiva (Medio)", "🟢 Alerta Verde (Bajo)"]},
             hover_name="comuna",
             hover_data={"Clasificacion_Riesgo": True, "distancia_foco_km": ":.2f Km", "Probabilidad (%)": True},
             zoom=7.5, center=dict(lat=lat_o, lon=lon_o),
@@ -252,11 +255,48 @@ with tab_mapa:
         df_telefonos = pd.DataFrame({"Organismo": ["CONAF", "Bomberos", "SAMU", "Carabineros"], "Línea": ["130", "132", "131", "133"]})
         st.table(df_telefonos)
 
+# ------------------------------------------------------------------------------
+# PESTAÑA 2: TABLA Y ANÁLISIS DE PROPAGACIÓN INTERACTIVA (MÓDULO NUEVO UX)
+# ------------------------------------------------------------------------------
 with tab_tabla:
-    st.subheader("📊 Tabla Comparativa de Impacto Territorial")
+    st.subheader("📊 Análisis Avanzado de Propagación Intercomunal")
+    st.write("Visualiza la relación crítica entre la distancia geográfica y el nivel de riesgo de impacto calculado:")
+
+    # Conteo dinámico de comunas por nivel de riesgo para desplegar micro-KPIs
+    c_roja = len(df_comunas[df_comunas['Clasificacion_Riesgo'] == "🔴 Alerta Roja (Extremo)"])
+    c_amarilla = len(df_comunas[df_comunas['Clasificacion_Riesgo'] == "🟠 Alerta Amarilla (Alto)"])
+    c_preventiva = len(df_comunas[df_comunas['Clasificacion_Riesgo'] == "🟡 Alerta Temprana Preventiva (Medio)"])
+    
+    kpi1, kpi2, kpi3 = st.columns(3)
+    with kpi1: st.metric("🔴 Comunas en Alerta Roja", f"{c_roja} localidades")
+    with kpi2: st.metric("🟠 Comunas en Alerta Amarilla", f"{c_amarilla} localidades")
+    with kpi3: st.metric("🟡 Comunas en Alerta Temprana", f"{c_preventiva} localidades")
+    
+    st.markdown("---")
+    col_tab_izq, col_tab_der = st.columns([1, 1])
+    
     df_tabla_limpia = df_comunas[['comuna', 'Provincia', 'poblacion_2017', 'distancia_foco_km', 'Probabilidad (%)', 'Clasificacion_Riesgo']].sort_values(by='Probabilidad (%)', ascending=False)
     df_tabla_limpia.columns = ['Comuna', 'Provincia', 'Población (Censo)', 'Distancia al Foco (Km)', 'Probabilidad de Impacto', 'Nivel de Riesgo']
-    st.dataframe(df_tabla_limpia, use_container_width=True, hide_index=True)
+
+    with col_tab_izq:
+        st.markdown("#### 📈 Matriz Analítica: Distancia vs Probabilidad")
+        # Gráfico Scatter Plot profesional que muestra la correlación inversa entre distancia y peligro
+        fig_scatter = px.scatter(
+            df_tabla_limpia, x="Distancia al Foco (Km)", y="Probabilidad de Impacto",
+            color="Nivel de Riesgo", size="Población (Censo)",
+            color_discrete_map={
+                "🔴 Alerta Roja (Extremo)": "#FF0000", "🟠 Alerta Amarilla (Alto)": "#F57C00",
+                "🟡 Alerta Temprana Preventiva (Medio)": "#FBC02D", "🟢 Alerta Verde (Bajo)": "#388E3C"
+            },
+            hover_name="Comuna", text="Comuna", height=420
+        )
+        fig_scatter.update_traces(textposition='top center')
+        fig_scatter.update_layout(xaxis_title="Distancia Geodésica al Foco (Km)", yaxis_title="Probabilidad de Afectación (%)", margin={"t":10,"b":10})
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+    with col_tab_der:
+        st.markdown("#### 📋 Registro Detallado Territorial (Filtro Activo)")
+        st.dataframe(df_tabla_limpia, use_container_width=True, hide_index=True, height=420)
 
 with tab_datos:
     st.subheader("💾 Exportación de Reportes Técnicos para Autoridades")
@@ -268,9 +308,7 @@ with tab_datos:
         mime="text/csv"
     )
 
-# ------------------------------------------------------------------------------
-# PESTAÑA 4: CONTEXTO CIENTÍFICO (REDISEÑO PROFESIONAL CON LOS NUEVOS DATOS)
-# ------------------------------------------------------------------------------
+# PESTAÑA 4: CONTEXTO CIENTÍFICO
 with tab_contexto:
     st.subheader("🧪 Fundamentos del Simulador Técnico")
     st.info("💡 **Marco de Referencia:** Este ecosistema digital modela el comportamiento del fuego cruzando factores meteorológicos cinéticos con la biomasa de la Región del Biobío para asistir la toma de decisiones del COE.")
@@ -286,11 +324,8 @@ with tab_contexto:
 
     st.markdown("---")
     st.markdown("### 🔬 Base Científica: Ecuación Estándar de Rothermel (1972)")
-    st.write("El backend simplifica la ecuación de propagación física de fluidos complejos utilizada internacionalmente por agencias y CONAF:")
-    
     st.latex(r"R = \frac{I_R \cdot \xi \cdot (1 + \Phi_w + \Phi_s)}{\rho_b \cdot \epsilon \cdot Q_{ig}}")
     
-    # Explicación del modelo matemático
     exp1, exp2 = st.columns(2)
     with exp1:
         st.markdown("""
@@ -320,14 +355,10 @@ with tab_contexto:
                  "* **Falta de Pack:** No incluye la densidad de empaquetamiento ni la humedad foliar fina del material vegetal muerto.\n"
                  "* **Sin Mitigación Dinámica:** No considera el impacto de bomberos, brigadas terrestres ni aeronaves de combate.")
 
-# ------------------------------------------------------------------------------
-# PESTAÑA 5: PLAN DE PREVENCION (DISEÑO INSTITUCIONAL CON ALERTAS OFICIALES)
-# ------------------------------------------------------------------------------
+# PESTAÑA 5: PLAN DE PREVENCIÓN
 with tab_prevencion:
     st.subheader("🌲 Institucionalidad y Escala de Alertas SENAPRED / CONAF")
-    st.write("El sistema clasifica automáticamente el riesgo territorial utilizando los colores oficiales de emergencia de Chile:")
     
-    # Despliegue técnico institucional de Alertas
     st.error("### 🔴 Alerta Roja (Impacto: 75% - 100%) — Estado Extremo\n"
              "**Condición:** Amenaza inminente a vidas humanas, viviendas e infraestructura crítica. El viento $\ge 20\\text{ km/h}$ y humedad $< 20\\%$ gatillan el **'Botón Rojo'** de CONAF.\n"
              "**Acción COE:** Evacuación obligatoria inmediata vía mensajería SAE y despliegue total de recursos aéreos y terrestres.")
@@ -346,9 +377,7 @@ with tab_prevencion:
 
     st.markdown("---")
     st.markdown("### 🎛️ Manual Interactivo: Las 6 Variables Críticas de Control")
-    st.write("Haz clic en cada sección para entender el comportamiento físico y los umbrales de riesgo detrás de cada control de tu panel:")
     
-    # Explicación interactiva profesional usando expanders
     with st.expander("💨 Velocidad del Viento (Peso: 0.30)"):
         st.markdown("""
         **Comportamiento Físico:** Factor cinético principal. Aporta oxígeno a la combustión, deseca la vegetación y genera *spotting* (brasas transportadas a distancia que crean focos secundarios).
@@ -391,5 +420,5 @@ with tab_prevencion:
 
     with st.expander("📍 Comuna de origen y Enfoque Geográfico"):
         st.markdown("""
-        **Comportamiento:** Define el epicentro geográfico. El simulador calcula el cono basándose en distancias euclidianas. Las zonas costeras como *Arauco* o *Lebu* tienen mayor recurrencia histórica debido a la fuerte densidad e influencia de vientos marinos.
+        **Comportamiento:** Define el Variable epicentro geográfico. El simulador calcula el cono basándose en distancias euclidianas. Las zonas costeras como *Arauco* o *Lebu* tienen mayor recurrencia histórica debido a la fuerte densidad e influencia de vientos marinos.
         """)
