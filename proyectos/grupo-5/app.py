@@ -30,42 +30,45 @@ albergues_biobio = {
 }
 
 # ==============================================================================
-# 2. CARGA INTELIGENTE DE DATOS CON PROTOCOLO ABSOLUTO (ESCALABLE PARA MÁS DATASETS)
+# 2. CARGA INTELIGENTE DE DATOS CON PROTOCOLO ABSOLUTO Y TOLERANCIA DE STRINGS
 # ==============================================================================
 @st.cache_data
 def inicializar_sistema():
-    # DECISIÓN NO OBVIA: os.path.abspath(__file__) localiza la ubicación real en el servidor.
-    # Desde ahí navegamos directo a la carpeta 'data/'. Esto soluciona los bloqueos de Linux.
+    # Localizamos de forma matemática exacta el directorio del script en los servidores Linux
     directorio_script = os.path.dirname(os.path.abspath(__file__))
     carpeta_data = os.path.join(directorio_script, "data")
     
-    # Construcción de rutas absolutas e inequívocas
     ruta_comunas = os.path.join(carpeta_data, "Latitud - Longitud Chile.csv")
     ruta_bosques = os.path.join(carpeta_data, "bosques_chile_excel.csv")
     
-    # Verificación estricta de existencia en el servidor antes de la lectura
-    if not os.path.exists(ruta_comunas):
-        raise FileNotFoundError(f"Falta el archivo base de comunas en la ruta: {ruta_comunas}")
-    if not os.path.exists(ruta_bosques):
-        raise FileNotFoundError(f"Falta el archivo de vegetación en la ruta: {ruta_bosques}")
+    if not os.path.exists(ruta_comunas) or not os.path.exists(ruta_bosques):
+        raise FileNotFoundError("Verifica que los archivos CSV estén guardados dentro de la carpeta 'data/'")
         
-    # Lectura e indexación de los DataFrames
     df_c = pd.read_csv(ruta_comunas)
     df_b = pd.read_csv(ruta_bosques, sep=';')
 
     # ==========================================================================
-    # ➕ NOTA TÉCNICA: Si agregas más datasets en el futuro a la carpeta 'data/',
-    # solo debes replicar estas dos líneas por cada archivo nuevo:
-    # ruta_nuevo = os.path.join(carpeta_data, "tu_nuevo_archivo.csv")
-    # df_nuevo = pd.read_csv(ruta_nuevo)
+    # ➕ PROTOCOLO DE ESCALABILIDAD FUTURA:
+    # Si subes más datasets en el futuro a proyectos/grupo-5/data/, solo añade:
+    # ruta_nuevo_dataset = os.path.join(carpeta_data, "nombre_archivo.csv")
+    # df_nuevo = pd.read_csv(ruta_nuevo_dataset)
     # ==========================================================================
 
-    # Formateo y limpieza del set demográfico por codificación (\xa0Biobío)
-    df_c = df_c[df_c['Región'].astype(str).str.contains('Biobío')]
-    df_c['comuna'] = df_c['Comuna'].str.strip()
-    df_c['latitud_decimal'] = df_c['Latitud (Decimal)']
-    df_c['longitud_decimal'] = df_c['Longitud (decimal)']
-    df_c['poblacion_2017'] = df_c['Población Año 2017'].astype(str).str.replace(',', '').str.replace('.', '').astype(float).astype(int)
+    # CORRECCIÓN CRÍTICA DE RUTA Y MAPA GRIS: Limpiamos los espacios en blanco ocultos (\xa0) 
+    # de la columna 'Región' para que el filtro no devuelva 0 filas y el mapa no quede vacío.
+    df_c['Región_Clean'] = df_c['Región'].astype(str).str.replace(r'\s+', '', regex=True).str.lower()
+    df_comunas_biobio = df_c[df_c['Región_Clean'].str.contains('biobio', na=False)].copy()
+    
+    # Procesamiento y formateo de variables geográficas y demográficas
+    df_comunas_biobio['comuna'] = df_comunas_biobio['Comuna'].str.strip()
+    df_comunas_biobio['latitud_decimal'] = pd.to_numeric(df_comunas_biobio['Latitud (Decimal)'], errors='coerce')
+    df_comunas_biobio['longitud_decimal'] = pd.to_numeric(df_comunas_biobio['Longitud (decimal)'], errors='coerce')
+    
+    # Limpieza robusta del conteo de habitantes eliminando separadores conflictivos de Excel
+    df_comunas_biobio['poblacion_2017'] = df_comunas_biobio['Población Año 2017'].astype(str).str.replace(',', '').str.replace('.', '').astype(int)
+    
+    # Eliminar cualquier fila que haya quedado sin coordenadas válidas para evitar colapsos cartográficos
+    df_comunas_biobio = df_comunas_biobio.dropna(subset=['latitud_decimal', 'longitud_decimal'])
     
     df_b['Región'] = df_b['Región'].str.strip()
     def limpiar_numero_chileno(val):
@@ -81,13 +84,12 @@ def inicializar_sistema():
         "bosques_total_ha": limpiar_numero_chileno(row_biobio['Total'])
     }
     
-    return df_c, vegetacion
+    return df_comunas_biobio, vegetacion
 
 try:
     df_comunas, datos_biobio = inicializar_sistema()
 except Exception as e:
-    st.error(f"❌ Error de enrutamiento en Streamlit Cloud: {e}")
-    st.info("Comprueba que los nombres de los archivos en GitHub tengan las mismas mayúsculas, minúsculas y espacios.")
+    st.error(f"❌ Error de enrutamiento o parseo: {e}")
     st.stop()
 
 # ==============================================================================
@@ -115,7 +117,7 @@ combustible = (
     (datos_biobio["bosque_nativo_ha"] * 0.6)
 ) / datos_biobio["bosques_total_ha"] * 100
 
-sequedad = 100 - humedad
+sequedad = 100 - humidity_var if 'humidity_var' in locals() else 100 - humedad
 ip = (0.30 * viento) + (0.30 * combustible) + (0.20 * temperatura) + (0.10 * sequedad) + (0.10 * pendiente)
 ip = min(max(ip, 0), 100)
 
@@ -194,7 +196,7 @@ with tab_mapa:
             category_orders={"Clasificacion_Riesgo": ["🔴 Extremo (Foco)", "🔴 Extremo", "🟠 Alto", "🟡 Medio", "🟢 Bajo"]},
             hover_name="comuna",
             hover_data={"Clasificacion_Riesgo": True, "distancia_foco_km": ":.2f Km", "Probabilidad (%)": True},
-            zoom=7.5, center=dict(lat=lat_o, lon=lon_o),
+            zoom=7.8, center=dict(lat=lat_o, lon=lon_o),
             mapbox_style="open-street-map", height=480
         )
         fig_mapa.update_traces(hovertemplate="<b>%{hovertext}</b><br><br>Riesgo: %{customdata[0]}<br>Distancia: %{customdata[1]}<br>Probabilidad: %{customdata[2]}<br><b>Viento:</b> " + f"{viento} km/h hacia el {dir_viento}<br>")
