@@ -262,7 +262,7 @@ st.markdown(
 )
 
 pagina_mapa = st.Page("paginas/mapa.py", title="Mapa", icon="🗺️", default=True)
-pagina_dashboard = st.Page("paginas/dashboard.py", title="Dashboard", icon="📊")
+pagina_dashboard = st.Page("paginas/dashboard.py", title="Panel Estadístico", icon="📊")
 
 navegacion = st.navigation([pagina_mapa, pagina_dashboard])
 navegacion.run()
