@@ -163,4 +163,3 @@ with col_graf3:
     df_mostrar = df_mostrar.sort_values('Ingreso Neto ($)', ascending=False)
     
     st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
-    st.success("✅ **Tip para la presentación:** Haz clic en el encabezado 'Tasa Devolución' para mostrarle a los profesores cuáles prendas fallan más.")
