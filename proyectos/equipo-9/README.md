@@ -6,7 +6,7 @@
 ---
 
 ## 📌 Acceso a la Aplicación
-💻 **Dashboard Interactivo:** 
+💻 **Dashboard Interactivo:** https://sic2026c-pcohort1-fnct2pcxt4cq7vrytzxyzt.streamlit.app/
 
 ---
 
