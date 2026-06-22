@@ -918,22 +918,6 @@ def render_chatbot(d_filtros, contexto_lugar):
                 overflow: hidden; /* Esencial para que las texturas no se salgan */
                 z-index: 1;
             }
-            
-            /* 2. Textura de líneas diagonales (Patrón técnico azulado) */
-            div[data-testid="stColumn"]:has(#chatbot-anchor)::before {
-                content: "";
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: repeating-linear-gradient(
-                    45deg,
-                    rgba(59, 130, 246, 0.03),
-                    rgba(59, 130, 246, 0.03) 2px,
-                    transparent 2px,
-                    transparent 12px
-                );
-                pointer-events: none; /* No bloquea los clics en el chat */
-                z-index: -1;
-            }
 
             /* 3. Resplandor radial en la esquina superior derecha */
             div[data-testid="stColumn"]:has(#chatbot-anchor)::after {

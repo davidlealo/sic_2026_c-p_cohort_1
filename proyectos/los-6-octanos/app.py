@@ -93,21 +93,6 @@ st.markdown(
             box-shadow: inset 0 4px 15px rgba(0, 0, 0, 0.4), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
         }
 
-        # /* Textura de líneas diagonales para darle un aire técnico/dashboard */
-        # .hero-banner::before {
-        #     content: "";
-        #     position: absolute;
-        #     top: 0; left: 0; right: 0; bottom: 0;
-        #     background: repeating-linear-gradient(
-        #         45deg,
-        #         rgba(16, 185, 129, 0.02),
-        #         rgba(16, 185, 129, 0.02) 2px,
-        #         transparent 2px,
-        #         transparent 12px
-        #     );
-        #     pointer-events: none; /* Para que no bloquee el texto */
-        # }
-
         /* Resplandor verde suave en la esquina superior derecha */
         .hero-banner::after {
             content: "";
