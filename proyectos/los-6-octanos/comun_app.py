@@ -318,19 +318,15 @@ def make_legend_html(vmin, vmax, combustible, has_user):
 
     markers_html = ""
     if has_user:
-        user_icon = (
-            '<svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">'
-            '<circle cx="7" cy="7" r="6" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>'
-            '</svg>'
-        )
+        # AQUÍ ESTÁN LOS COLORES CORREGIDOS:
         markers_html = f"""
         <div style="margin-top:18px;border-top:1px solid #374151;padding-top:16px;">
             <p style="font-weight:700;font-size:11px;margin:0 0 12px 0;
-                      color:#9CA3AF;text-transform:uppercase;letter-spacing:.5px;">
+                      color:#9CA3AF;text-transform:uppercase;letter-spacing:.5px;font-family:sans-serif;">
                 Marcadores
             </p>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                {user_icon}
+                {mini_circle_svg("#3B82F6", "#FFFFFF")}
                 <span style="font-size:12px;color:#E5E7EB;line-height:1.2;">Tu Ubicación</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -338,7 +334,7 @@ def make_legend_html(vmin, vmax, combustible, has_user):
                 <span style="font-size:12px;color:#E5E7EB;line-height:1.2;">Mejor Opción</span>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
-                {mini_circle_svg("#3B82F6", "#FFFFFF")}
+                {mini_circle_svg("#FBBF24", "#FFFFFF")}
                 <span style="font-size:12px;color:#E5E7EB;line-height:1.2;">Segunda Opción</span>
             </div>
         </div>"""
@@ -690,14 +686,16 @@ def construir_mapa_folium(d, combustible, fondo_mapa, user_lat, user_lon, opcion
     for _, row in d.iterrows():
         precio = row[combustible]
         codigo = row.get("codigo_estacion")
+        
+        # Color basado en el gradiente de precios
         fill_color = colormap(precio)
 
-        # Mantenemos CircleMarker por defecto, pero puedes reemplazarlo por tus propios diseños
         if codigo == best_codigo:
+            # VERDE para la mejor opción (Ahorro)
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
                 radius=11, color="#10B981", weight=3,
-                fill=True, fill_color=fill_color, fill_opacity=0.95,
+                fill=True, fill_color="#10B981", fill_opacity=0.95,
                 popup=folium.Popup(
                     make_popup_html(
                         row, combustible, tag="best",
@@ -710,11 +708,13 @@ def construir_mapa_folium(d, combustible, fondo_mapa, user_lat, user_lon, opcion
                 ),
                 tooltip=f"Mejor Opción: {row['marca']} — {pesos(precio)}",
             ).add_to(m)
+            
         elif codigo == second_codigo:
+            # AMARILLO/ÁMBAR para la segunda opción (Alternativa)
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
-                radius=8, color="#3B82F6", weight=2.5,
-                fill=True, fill_color=fill_color, fill_opacity=0.85,
+                radius=10, color="#FBBF24", weight=3,
+                fill=True, fill_color="#FBBF24", fill_opacity=0.95,
                 popup=folium.Popup(
                     make_popup_html(
                         row, combustible, tag="second",
@@ -727,13 +727,13 @@ def construir_mapa_folium(d, combustible, fondo_mapa, user_lat, user_lon, opcion
                 ),
                 tooltip=f"Segunda Opción: {row['marca']} — {pesos(precio)}",
             ).add_to(m)
+            
         else:
-            r_size = 4 if has_user else 5
-            f_opac = 0.35 if has_user else 0.75
+            # Estaciones normales siguen el gradiente de precios
             folium.CircleMarker(
                 location=[row["lat"], row["lon"]],
-                radius=r_size, color="#374151", weight=1,
-                fill=True, fill_color=fill_color, fill_opacity=f_opac,
+                radius=5, color="#374151", weight=1,
+                fill=True, fill_color=fill_color, fill_opacity=0.6,
                 popup=folium.Popup(
                     make_popup_html(row, combustible, user_lat=user_lat, user_lon=user_lon),
                     max_width=300,
