@@ -1,7 +1,15 @@
 streamlit
 pandas
-numpy
 plotly
-openpyxl
+numpy
+folium
+ipyleaflet
+ipython
+ipywidgets
 matplotlib
 seaborn
+jupyter
+notebook
+pdfplumber
+pyproj
+openpyxl
